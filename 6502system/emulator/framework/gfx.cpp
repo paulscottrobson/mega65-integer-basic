@@ -2,7 +2,7 @@
 // *******************************************************************************************************************************
 //
 //		Name:		gfx.c
-//		Purpose:	Support library for SDL.
+//		Purpose:	Support library for SKeyL.
 //		Created:	1st September 2015
 //		Author:		Paul Robson (paul@robsons.org.uk)
 //
