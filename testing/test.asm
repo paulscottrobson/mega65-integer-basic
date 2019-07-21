@@ -1,4 +1,3 @@
-		
 		* = 	$0000
 		.byte 	0
 
@@ -43,7 +42,7 @@ Start:
 		sta 	$0B 						; char RAM appears to be here.
 		lda 	#$01
 		sta 	$0A
-		lda 	#$F9
+		lda 	#$F8
 		sta 	$09
 		lda 	#$00
 		sta 	$08
@@ -54,7 +53,8 @@ SetColorRam:
 		sta 	($08),z
 		dez
 		bne 	SetColorRam
-
+		inc 	$09
+		bne 	SetColorRam
 
 Screen = $1000								; 2k screen RAM here
 
@@ -94,7 +94,21 @@ CopyPetFont:
 		dex
 		bne 	CopyPetFont
 
-Halt:	inx
+		lda 	#$36
+		sta 	$05
+		lda 	#$10
+		sta 	$04
+
+Halt:	ldz 	#0
+		nop
+		lda		($04),z
+		beq 	Halt
+		sta 	Screen
+		sta 	Screen+2
+		sta 	Screen+4
+		nop
+		sta 	($04),z
+
 		bra 	Halt
 
 Dummy:	rti
