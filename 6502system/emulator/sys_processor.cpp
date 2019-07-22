@@ -80,6 +80,11 @@ void CPUExit(void) {}
 #endif
 
 void CPUReset(void) {
+	FILE *f = fopen("rom.bin","rb");
+	if (f != NULL) {
+		CPULoadChunk(f,ramMemory+0xC000,0x4000);
+		fclose(f);
+	}
 	resetProcessor();																// Reset CPU
 }
 
@@ -121,7 +126,7 @@ void CPUWriteMemory(WORD16 address,BYTE8 data) {
 int CPUKeyHandler(int key,int inRunMode) {
 	if (inRunMode != 0) {
 		int akey = GFXToASCII(key,-1);
-		printf("%d\n",akey);
+		//printf("%d\n",akey);
 		ramMemory[0xF800] = akey & 0xFF;
 		return 0;
 	}

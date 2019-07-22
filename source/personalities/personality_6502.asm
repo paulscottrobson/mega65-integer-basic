@@ -1,8 +1,8 @@
 ; ******************************************************************************
 ; ******************************************************************************
 ;
-;		Name: 		personality_mega65.asm
-;		Purpose:	Mega65 Personality Code
+;		Name: 		personality_6502.asm
+;		Purpose:	Personality Code for Development Platform.
 ;		Date: 		22nd July 2019
 ;		Author:		Paul Robson
 ;
@@ -27,11 +27,10 @@ EXTHeight = 25 								; screen height
 EXTZPWork = 4								; Zero Page work for EXT
 
 EXTZeroPage = $10 							; Zero Page allocated from here
-EXTNonZeroPage = $2000 						; Non-Zero page allocated from here
-EXTEndOfMemory = $4000 						; Memory ends.
+EXTNonZeroPage = $1000 						; Non-Zero page allocated from here
+EXTEndOfMemory = $8000 						; Memory ends.
 
-EXTScreen = $1000							; 2k screen RAM here
-EXTCharSet = $800							; 2k character set (0-7F) here
+EXTScreen = $F000							; 1k screen RAM here
 
 EXTAltSpace = 64
 
@@ -41,17 +40,13 @@ EXTAltSpace = 64
 ;
 ; ******************************************************************************
 
-	* = 0
-	.word 	0 								; forces it to be a 128k ROM (at least)
+	* = $C000
+	.word 	0 								; forces it to be a 16k ROM
 
 	* = 	$FFFA 							; create the vectors.
 	.word 	EXTDummyInterrupt
 	.word 	EXTStartPersonalise
 	.word 	EXTDummyInterrupt
-
-	* = 	$A000							; put the font at $A000
-EXTCBMFont:
-	.binary "c64-chargen.rom"
 
 	* = 	$E000
 
@@ -102,26 +97,13 @@ EXTEndCode:	.macro 							; don't need to do anything.
 ; ******************************************************************************
 
 EXTReadKey:
-	phz
-	lda 	#$0F 							; set up to write to read keyboard.
-	sta 	EXTZPWork+3
-	lda 	#$FD
-	sta 	EXTZPWork+2
-	lda 	#$36
-	sta 	EXTZPWork+1
-	lda 	#$10
-	sta 	EXTZPWork+0	
-	ldz 	#0 			
-	nop 									; read keyboard
-	lda 	(EXTZPWork),z 
-	beq 	_EXTRKExit
-	pha 									; save key
-	tza 									; reset input
-	nop
-	sta 	(EXTZPWork),z
-	pla 									; restore/return value
-_EXTRKExit:
-	plz
+	lda 	$F800 								; read key
+	beq 	_EXTExit
+	pha 										; key pressed clear queue byte.
+	lda 	#0
+	sta 	$F800
+	pla
+_EXTExit:	
 	rts
 
 ; ******************************************************************************
@@ -132,11 +114,8 @@ _EXTRKExit:
 
 EXTReadScreen:
 	phy 										; save Y
-	txa 										; multiply XY by 2
-	asl 	a
-	sta 	EXTZPWork							; into EXTZPWork
+	stx 	EXTZPWork							; into EXTZPWork
 	tya
-	rol 	a
 	ora 	#EXTScreen>>8 						; move into screen area
 	sta 	EXTZPWork+1 						; read character there
 	ldy 	#0
@@ -168,25 +147,17 @@ EXTWriteScreen:
 
 EXTClearScreen:
 	pha 										; save registers
-	phy
-	lda 	#EXTScreen & $FF 					; set up pointer
-	sta 	EXTZPWork
-	lda 	#EXTScreen >> 8
-	sta 	EXTZPWork+1
-	ldy 	#0
+	phx
+	ldx 	#0
 _EXTCSLoop:
 	lda 	#EXTAltSpace
-	sta 	(EXTZPWork),y
-	iny
-	lda 	#0
-	sta 	(EXTZPWork),y
-	iny 	
+	sta 	EXTScreen+0,x
+	sta 	EXTScreen+1,x
+	sta 	EXTScreen+2,x
+	sta 	EXTScreen+3,x
+	inx	
 	bne 	_EXTCSLoop
-	inc 	EXTZPWork+1 						; next screen page	
-	lda 	EXTZPWork+1
-	cmp 	#(EXTScreen>>8)+8 					; done 2k ?
-	bne 	_EXTCSLoop
-	ply 										; restore
+	plx 										; restore
 	pla
 	rts
 
@@ -196,6 +167,7 @@ _EXTCSLoop:
 ;
 ; ******************************************************************************
 
+
 EXTScrollDisplay:
 	pha 										; save registers
 	phy
@@ -204,20 +176,19 @@ EXTScrollDisplay:
 	lda 	#EXTScreen >> 8
 	sta 	EXTZPWork+1
 _EXTScroll:	
-	ldy 	#EXTWidth*2 						; x 2 because of two byte format.
+	ldy 	#EXTWidth
 	lda 	(EXTZPWork),y
 	ldy 	#0
 	sta 	(EXTZPWork),y
 	inc 	EXTZPWork 							; bump address
-	inc 	EXTZPWork
 	bne 	_EXTNoCarry
 	inc 	EXTZPWork+1
 _EXTNoCarry:
 	lda 	EXTZPWork 							; done ?
-	cmp	 	#(EXTScreen+2*EXTWidth*(EXTHeight-1)) & $FF
+	cmp	 	#(EXTScreen+EXTWidth*(EXTHeight-1)) & $FF
 	bne 	_EXTScroll
 	lda 	EXTZPWork+1
-	cmp	 	#(EXTScreen+2*EXTWidth*(EXTHeight-1)) >> 8
+	cmp	 	#(EXTScreen+EXTWidth*(EXTHeight-1)) >> 8
 	bne 	_EXTScroll
 	;
 	ldy 	#0									; clear bottom line.
@@ -225,8 +196,7 @@ _EXTLastLine:
 	lda 	#EXTAltSpace
 	sta 	(EXTZPWork),y
 	iny
-	iny
-	cpy 	#EXTWidth*2
+	cpy 	#EXTWidth
 	bne 	_EXTLastLine	
 	ply 										; restore and exit.
 	pla
@@ -238,76 +208,6 @@ _EXTLastLine:
 ;
 ; ******************************************************************************
 
-EXTWrite 	.macro 							; write to register using
-	ldz 	#\1 							; address already set up
-	lda 	#\2
-	nop
-	sta 	(EXTZPWork),z
-.endm
-
 EXTReset:
-	pha 									; save registers
-	phx
-	phy
-	lda 	#$0F 							; set up to write to video system.
-	sta 	EXTZPWork+3
-	lda 	#$FD
-	sta 	EXTZPWork+2
-	lda 	#$30
-	sta 	EXTZPWork+1
-	lda 	#$00
-	sta 	EXTZPWork+0
-
-	#EXTWrite $30,$40 						; Charset
-	#EXTWrite $20,$00 						; border
-	#EXTWrite $21,$00	 					; background
-	#EXTWrite $6F,$60						; 60Hz
-
-	#EXTWrite $18,$42	 					; screen address $0800 video address $2000
-	#EXTWrite $11,$1B
-	#EXTWrite $16,$C8
-
-	#EXTWrite $54,$C5
-	#EXTWrite $58,80
-	#EXTWrite $59,0
-
-	#EXTWrite $00,$FF
-	#EXTWrite $01,$FF
-
-	#EXTWrite $30,4
-	#EXTWrite $70,$FF
-
-	lda 	#$00							; colour RAM at $1F800-1FFFF (2kb)
-	sta 	EXTZPWork+3 
-	lda 	#$01
-	sta 	EXTZPWork+2
-	lda 	#$F8
-	sta 	EXTZPWork+1
-	lda 	#$00
-	sta 	EXTZPWork+0
-	ldz 	#0
-_EXTClearColorRam:	
-	lda 	#8 								; fill that with this colour.
-	nop
-	sta 	(EXTZPWork),z
-	dez
-	bne 	_EXTClearColorRam
-	inc 	EXTZPWork+1
-	bne 	_EXTClearColorRam
-
-	ldx 	#0 								; copy PET Font into memory.
-_EXTCopyCBMFont:
-	lda 	EXTCBMFont,x
-	sta 	EXTCharSet,x
-	lda 	EXTCBMFont+$100,x
-	sta 	EXTCharSet+$100,x
-	lda 	EXTCBMFont+$200,x
-	sta 	EXTCharSet+$200,x
-	lda 	EXTCBMFont+$300,x
-	sta 	EXTCharSet+$300,x
-	dex
-	bne 	_EXTCopyCBMFont
-	ply 									; restore and exit.
-	plx
-	pla
 	rts
+
