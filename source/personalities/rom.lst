@@ -1,7 +1,7 @@
 
 ; 64tass Turbo Assembler Macro V1.54.1900 listing file
-; 64tass -a --m4510 -D TARGET=1 -b -L rom.lst -o rom.bin ptest.asm
-; Mon Jul 22 15:11:53 2019
+; 64tass --m4510 -D TARGET=1 -b -L rom.lst -o rom.bin ptest.asm
+; Mon Jul 22 18:07:25 2019
 
 ;Offset	;Hex		;Monitor	;Source
 
@@ -22,7 +22,6 @@
 =$4000					EXTEndOfMemory = $4000 						; Memory ends.
 =$1000					EXTScreen = $1000							; 2k screen RAM here
 =$800					EXTCharSet = $800							; 2k character set (0-7F) here
-=64					EXTAltSpace = 64
 >0000	00 00					.word 	0 								; forces it to be a 128k ROM (at least)
 >fffa	00 e0					.word 	EXTDummyInterrupt
 >fffc	01 e0					.word 	EXTStartPersonalise
@@ -292,7 +291,7 @@
 .e003	9a		txs			txs
 .e004	20 a2 e0	jsr $e0a2		jsr 	EXTReset 						; reset video
 .e007	20 4a e0	jsr $e04a		jsr 	EXTClearScreen 					; clear screen
-.e00a	4c 56 e1	jmp $e156		jmp 	Start 							; start main application
+.e00a	4c 98 e2	jmp $e298		jmp 	Start 							; start main application
 .e00d					EXTReadKey:
 .e00d	db		phz			phz
 .e00e	a9 0f		lda #$0f		lda 	#$0F 							; set up to write to read keyboard.
@@ -346,7 +345,7 @@
 .e052	85 05		sta $05			sta 	EXTZPWork+1
 .e054	a0 00		ldy #$00		ldy 	#0
 .e056					_EXTCSLoop:
-.e056	a9 40		lda #$40		lda 	#EXTAltSpace
+.e056	a9 20		lda #$20		lda 	#32
 .e058	91 04		sta ($04),y		sta 	(EXTZPWork),y
 .e05a	c8		iny			iny
 .e05b	a9 00		lda #$00		lda 	#0
@@ -385,7 +384,7 @@
 .e091	d0 e4		bne $e077		bne 	_EXTScroll
 .e093	a0 00		ldy #$00		ldy 	#0									; clear bottom line.
 .e095					_EXTLastLine:
-.e095	a9 40		lda #$40		lda 	#EXTAltSpace
+.e095	a9 20		lda #$20		lda 	#32
 .e097	91 04		sta ($04),y		sta 	(EXTZPWork),y
 .e099	c8		iny			iny
 .e09a	c8		iny			iny
@@ -498,26 +497,232 @@
 
 ;******  Return to file: ptest.asm
 
-.e156					Start:
-.e156	a9 00		lda #$00		lda 	#0
-.e158	aa		tax			tax
-.e159	a8		tay			tay
-.e15a					SLoop:
-.e15a	8a		txa			txa
-.e15b	29 7f		and #$7f		and 	#$7F
-.e15d	20 3e e0	jsr $e03e		jsr 	EXTWriteScreen
-.e160	e8		inx			inx
-.e161	d0 f7		bne $e15a		bne 	SLoop
-.e163	c8		iny			iny
-.e164	c0 08		cpy #$08		cpy 	#8
-.e166	d0 f2		bne $e15a		bne 	SLoop
-.e168					WaitKey:
-.e168	20 0d e0	jsr $e00d		jsr 	EXTReadKey
-.e16b	09 00		ora #$00		ora 	#0
-.e16d	f0 f9		beq $e168		beq 	WaitKey
-.e16f	48		pha			pha
-.e170	20 6d e0	jsr $e06d		jsr 	EXTScrollDisplay
-.e173	8d 00 10	sta $1000		sta 	EXTScreen+0
-.e176	80 f0		bra $e168		bra 	WaitKey
+
+;******  Processing file: personality_io.asm
+
+=8					IOCursorX = 8 								; cursor position
+=9					IOCursorY = 9
+=10					IOLineLo = 10 								; line position.
+=11					IOLineHi = 11
+.e156					IOInitialise:
+.e156	20 4a e0	jsr $e04a			jsr 	EXTClearScreen 				; clear screen.
+.e159	48		pha				pha
+.e15a	a9 00		lda #$00			lda 	#00 						; home cursor
+.e15c	85 08		sta $08				sta 	IOCursorX
+.e15e	85 09		sta $09				sta 	IOCursorY
+.e160	68		pla				pla
+.e161	60		rts				rts
+.e162					IOPrintChar:
+.e162	48		pha				pha 								; save registers
+.e163	da		phx				phx
+.e164	5a		phy				phy
+.e165	29 7f		and #$7f			and 	#$7F 						; 7 bits only.
+.e167	c9 0d		cmp #$0d			cmp 	#13 						; handle CR
+.e169	f0 14		beq $e17f			beq 	_IOPCCarriageReturn
+.e16b	c9 20		cmp #$20			cmp 	#$20 						; control character
+.e16d	90 30		bcc $e19f			bcc 	_IOPControl
+.e16f	20 f7 e1	jsr $e1f7			jsr	 	IOGetCursorXY 				; get cursor address in XY.
+.e172	29 3f		and #$3f			and 	#$3F 						; 6 bit PETSCII
+.e174	20 3e e0	jsr $e03e			jsr 	EXTWriteScreen 				; write character at that position.
+.e177	e6 08		inc $08				inc 	IOCursorX 					; increment cursor X
+.e179	a5 08		lda $08				lda 	IOCursorX
+.e17b	c9 28		cmp #$28			cmp 	#EXTWidth 					; zero if at RHS
+.e17d	d0 1c		bne $e19b			bne 	_IOPCExit
+.e17f					_IOPCCarriageReturn:
+.e17f	a9 00		lda #$00			lda 	#0							; LHS
+.e181	85 08		sta $08				sta 	IOCursorX
+.e183	e6 09		inc $09				inc 	IOCursorY 					; one down
+.e185	a5 09		lda $09				lda 	IOCursorY 					; off the bottom ?
+.e187	c9 19		cmp #$19			cmp 	#EXTHeight
+.e189	d0 10		bne $e19b			bne 	_IOPCExit
+.e18b	c6 09		dec $09				dec 	IOCursorY 					; back up and scroll
+.e18d	20 6d e0	jsr $e06d			jsr 	EXTScrollDisplay
+.e190	80 09		bra $e19b			bra 	_IOPCExit
+.e192					_IOPCClear:
+.e192	20 4a e0	jsr $e04a			jsr 	EXTClearScreen
+.e195	a9 00		lda #$00			lda 	#0
+.e197	85 08		sta $08				sta 	IOCursorX
+.e199	85 09		sta $09				sta 	IOCursorY
+.e19b					_IOPCExit:
+.e19b	7a		ply				ply
+.e19c	fa		plx				plx
+.e19d	68		pla				pla
+.e19e	60		rts				rts
+.e19f					_IOPControl:
+.e19f	c9 1a		cmp #$1a			cmp 	#"Z"-64						; Ctrl-Z clear
+.e1a1	f0 ef		beq $e192			beq 	_IOPCClear
+.e1a3	c9 01		cmp #$01			cmp 	#"A"-64 					; Cursor movement.
+.e1a5	f0 18		beq $e1bf			beq 	_IOPLeft
+.e1a7	c9 04		cmp #$04			cmp 	#"D"-64
+.e1a9	f0 1e		beq $e1c9			beq 	_IOPRight
+.e1ab	c9 17		cmp #$17			cmp 	#"W"-64
+.e1ad	f0 26		beq $e1d5			beq 	_IOPUp
+.e1af	c9 13		cmp #$13			cmp 	#"S"-64
+.e1b1	f0 2c		beq $e1df			beq 	_IOPDown
+.e1b3	c9 08		cmp #$08			cmp 	#8							; Backspace
+.e1b5	d0 e4		bne $e19b			bne 	_IOPCExit
+.e1b7	20 f7 e1	jsr $e1f7			jsr	 	IOGetCursorXY 				; get cursor address in XY.
+.e1ba	a9 20		lda #$20			lda 	#" "
+.e1bc	20 3e e0	jsr $e03e			jsr 	EXTWriteScreen 				; write space at that position.
+.e1bf					_IOPLeft:
+.e1bf	c6 08		dec $08				dec 	IOCursorX
+.e1c1	10 d8		bpl $e19b			bpl 	_IOPCExit
+.e1c3	a9 27		lda #$27			lda 	#EXTWidth-1
+.e1c5	85 08		sta $08				sta 	IOCursorX
+.e1c7	80 d2		bra $e19b			bra 	_IOPCExit
+.e1c9					_IOPRight:
+.e1c9	e6 08		inc $08				inc 	IOCursorX
+.e1cb	a5 08		lda $08				lda 	IOCursorX
+.e1cd	49 28		eor #$28			eor 	#EXTWidth
+.e1cf	d0 ca		bne $e19b			bne 	_IOPCExit
+.e1d1	85 08		sta $08				sta 	IOCursorX
+.e1d3	80 c6		bra $e19b			bra 	_IOPCExit
+.e1d5					_IOPUp:
+.e1d5	c6 09		dec $09				dec 	IOCursorY
+.e1d7	10 c2		bpl $e19b			bpl 	_IOPCExit
+.e1d9	a9 18		lda #$18			lda 	#EXTHeight-1
+.e1db	85 09		sta $09				sta 	IOCursorY
+.e1dd	80 bc		bra $e19b			bra 	_IOPCExit
+.e1df					_IOPDown:
+.e1df	e6 09		inc $09				inc 	IOCursorY
+.e1e1	a5 09		lda $09				lda 	IOCursorY
+.e1e3	49 19		eor #$19			eor 	#EXTHeight
+.e1e5	d0 b4		bne $e19b			bne 	_IOPCExit
+.e1e7	85 09		sta $09				sta 	IOCursorY
+.e1e9	80 b0		bra $e19b			bra 	_IOPCExit
+.e1eb					IOUpperCase:
+.e1eb	c9 61		cmp #$61			cmp 	#"a"
+.e1ed	90 07		bcc $e1f6			bcc 	_IOUCExit
+.e1ef	c9 7b		cmp #$7b			cmp 	#"z"+1
+.e1f1	b0 03		bcs $e1f6			bcs 	_IOUCExit
+.e1f3	38		sec				sec
+.e1f4	e9 20		sbc #$20			sbc 	#32
+.e1f6					_IOUCExit:
+.e1f6	60		rts				rts
+.e1f7					IOGetCursorXY:
+.e1f7	48		pha				pha
+.e1f8	a5 09		lda $09				lda 	IOCursorY 					; multiply IOCursorY x 5
+.e1fa	0a		asl a				asl		a
+.e1fb	0a		asl a				asl		a 							; x 4, carry clear
+.e1fc	65 09		adc $09				adc 	IOCursorY 					; so this will be 0..199 now
+.e1fe	aa		tax				tax
+.e1ff	8a		txa				txa 								; x 10
+.e200	0a		asl a				asl 	a
+.e201	aa		tax				tax
+.e202	a9 00		lda #$00			lda 	#0
+.e204	2a		rol a				rol 	a
+.e205	a8		tay				tay
+.e206	8a		txa				txa 								; x 20
+.e207	0a		asl a				asl 	a
+.e208	aa		tax				tax
+.e209	98		tya				tya
+.e20a	2a		rol a				rol 	a
+.e20b	a8		tay				tay
+.e20c	8a		txa				txa 								; x 40
+.e20d	0a		asl a				asl 	a
+.e20e	aa		tax				tax
+.e20f	98		tya				tya
+.e210	2a		rol a				rol 	a
+.e211	a8		tay				tay
+.e212	8a		txa				txa 								; add X to that.
+.e213	18		clc				clc
+.e214	65 08		adc $08				adc 	IOCursorX
+.e216	aa		tax				tax
+.e217	90 01		bcc $e21a			bcc 	_IOGCXYExit
+.e219	c8		iny				iny
+.e21a					_IOGCXYExit:
+.e21a	68		pla				pla
+.e21b	60		rts				rts
+.e21c					IOReadLine:
+.e21c	48		pha				pha
+.e21d	86 0a		stx $0a				stx		IOLineLo
+.e21f	84 0b		sty $0b				sty 	IOLineHi
+.e221					_IROLLoop:
+.e221	20 f7 e1	jsr $e1f7			jsr	 	IOGetCursorXY 				; get cursor address in XY.
+.e224	20 2d e0	jsr $e02d			jsr 	EXTReadScreen 				; get character there.
+.e227	48		pha				pha
+.e228	a9 66		lda #$66			lda 	#102 						; write cursor character there
+.e22a	20 3e e0	jsr $e03e			jsr		EXTWriteScreen
+.e22d					_IROLWaitKey:
+.e22d	20 0d e0	jsr $e00d			jsr 	EXTReadKey
+.e230	09 00		ora #$00			ora 	#0
+.e232	f0 f9		beq $e22d			beq 	_IROLWaitKey
+.e234	20 eb e1	jsr $e1eb			jsr 	IOUpperCase 				; capitalise
+.e237	aa		tax				tax 								; save in X
+.e238	68		pla				pla 								; restore old
+.e239	da		phx				phx 								; save new character.
+.e23a	20 f7 e1	jsr $e1f7			jsr	 	IOGetCursorXY 				; get cursor address in XY.
+.e23d	20 3e e0	jsr $e03e			jsr 	EXTWriteScreen 				; write out.
+.e240	68		pla				pla 								; restore old
+.e241	c9 0d		cmp #$0d			cmp 	#13
+.e243	f0 05		beq $e24a			beq 	_IROLExit 					; exit if CR
+.e245	20 62 e1	jsr $e162			jsr 	IOPrintChar 				; print it.
+.e248	80 d7		bra $e221			bra 	_IROLLoop
+.e24a					_IROLExit:
+.e24a	a9 00		lda #$00			lda 	#0 							; go to start of line.
+.e24c	85 08		sta $08				sta 	IOCursorX
+.e24e	a0 00		ldy #$00			ldy 	#0 							; position
+.e250					_IROLCopy:
+.e250	5a		phy				phy 								; save position
+.e251	20 f7 e1	jsr $e1f7			jsr 	IOGetCursorXY 				; get cursor position.
+.e254	20 2d e0	jsr $e02d			jsr 	EXTReadScreen 				; read screen
+.e257	7a		ply				ply 								; get position back
+.e258	49 20		eor #$20			eor 	#$20
+.e25a	18		clc				clc
+.e25b	69 20		adc #$20			adc 	#$20
+.e25d	91 0a		sta ($0a),y			sta 	(IOLineLo),y 				; save in buffer.
+.e25f	e6 08		inc $08				inc 	IOCursorX 					; cursor right
+.e261	c8		iny				iny 								; bump pointer
+.e262	c0 28		cpy #$28			cpy 	#EXTWidth 					; not done full line.
+.e264	d0 ea		bne $e250			bne 	_IROLCopy
+.e266	a9 0d		lda #$0d			lda 	#13 						; carriage return
+.e268	20 62 e1	jsr $e162			jsr 	IOPrintChar
+.e26b	a0 28		ldy #$28			ldy 	#EXTWidth 					; trim trailing spaces
+.e26d					_IROLTrim:
+.e26d	88		dey				dey
+.e26e	30 06		bmi $e276			bmi 	_IROLFound
+.e270	b1 0a		lda ($0a),y			lda 	(IOLineLo),y
+.e272	c9 20		cmp #$20			cmp 	#32
+.e274	f0 f7		beq $e26d			beq 	_IROLTrim
+.e276					_IROLFound:
+.e276	c8		iny				iny
+.e277	a9 00		lda #$00			lda 	#0 							; make it ASCIIZ
+.e279	91 0a		sta ($0a),y			sta 	(IOLineLo),y
+.e27b	a6 0a		ldx $0a				ldx 	IOLineLo
+.e27d	a4 0b		ldy $0b				ldy 	IOLineHi
+.e27f	68		pla				pla
+.e280	60		rts				rts
+.e281					IOPrintString:
+.e281	48		pha				pha
+.e282	86 0a		stx $0a				stx 	IOLineLo
+.e284	84 0b		sty $0b				sty 	IOLineHi
+.e286	a0 00		ldy #$00			ldy 	#0
+.e288					_IOPSLoop:
+.e288	b1 0a		lda ($0a),y			lda 	(IOLineLo),y
+.e28a	f0 06		beq $e292			beq 	_IOPSExit
+.e28c	20 62 e1	jsr $e162			jsr 	IOPrintChar
+.e28f	c8		iny				iny
+.e290	80 f6		bra $e288			bra 	_IOPSLoop
+.e292					_IOPSExit
+.e292	a6 0a		ldx $0a				ldx 	IOLineLo
+.e294	a4 0b		ldy $0b				ldy 	IOLineHi
+.e296	68		pla				pla
+.e297	60		rts				rts
+
+;******  Return to file: ptest.asm
+
+.e298					Start:
+.e298	20 56 e1	jsr $e156		jsr 	IOInitialise
+.e29b	a2 ac		ldx #$ac		ldx 	#St1 & 255
+.e29d	a0 e2		ldy #$e2		ldy 	#St1 >> 8
+.e29f	20 81 e2	jsr $e281		jsr 	IOPrintString
+.e2a2					Loop:
+.e2a2	a2 80		ldx #$80		ldx 	#$80
+.e2a4	a0 00		ldy #$00		ldy 	#$00
+.e2a6	20 1c e2	jsr $e21c		jsr		IOReadLine
+>e2a9	03					.byte 	3
+.e2aa	80 f6		bra $e2a2		bra 	Loop
+>e2ac	37 31 36 37 20 42 59 54		St1:.text 	"7167 BYTES FREE",0
+>e2b4	45 53 20 46 52 45 45 00
 
 ;******  End of listing

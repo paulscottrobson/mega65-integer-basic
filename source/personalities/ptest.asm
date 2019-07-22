@@ -6,28 +6,20 @@
 	.if TARGET=2
 	.include 	"personality_6502.asm"
 	.endif
+	.include	"personality_io.asm"
 
 Start:
-	lda 	#0
-	tax
-	tay
-SLoop:
-	txa	
-	and 	#$7F
-	jsr 	EXTWriteScreen
-	inx
-	bne 	SLoop
-	iny 	
-	cpy 	#8
-	bne 	SLoop
+	jsr 	IOInitialise
+	ldx 	#St1 & 255
+	ldy 	#St1 >> 8
+	jsr 	IOPrintString
+Loop:
+	ldx 	#$80
+	ldy 	#$00
+	jsr		IOReadLine	
+	.byte 	3
+	bra 	Loop
 
-WaitKey:
-	jsr 	EXTReadKey
-	ora 	#0
-	beq 	WaitKey
-	pha	
-	jsr 	EXTScrollDisplay
-	sta 	EXTScreen+0
-	bra 	WaitKey
+St1:.text 	"7167 BYTES FREE",0
 
 	#EXTEndCode	

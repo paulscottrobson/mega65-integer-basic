@@ -32,8 +32,6 @@ EXTEndOfMemory = $8000 						; Memory ends.
 
 EXTScreen = $F000							; 1k screen RAM here
 
-EXTAltSpace = 64
-
 ; ******************************************************************************
 ;
 ;				Initialisation, Vector Tables, Character Set
@@ -150,11 +148,11 @@ EXTClearScreen:
 	phx
 	ldx 	#0
 _EXTCSLoop:
-	lda 	#EXTAltSpace
+	lda 	#32
 	sta 	EXTScreen+0,x
-	sta 	EXTScreen+1,x
-	sta 	EXTScreen+2,x
-	sta 	EXTScreen+3,x
+	sta 	EXTScreen+$100,x
+	sta 	EXTScreen+$200,x
+	sta 	EXTScreen+$300,x
 	inx	
 	bne 	_EXTCSLoop
 	plx 										; restore
@@ -166,7 +164,6 @@ _EXTCSLoop:
 ;					Scroll the whole display up one line.
 ;
 ; ******************************************************************************
-
 
 EXTScrollDisplay:
 	pha 										; save registers
@@ -193,7 +190,7 @@ _EXTNoCarry:
 	;
 	ldy 	#0									; clear bottom line.
 _EXTLastLine:
-	lda 	#EXTAltSpace
+	lda 	#32
 	sta 	(EXTZPWork),y
 	iny
 	cpy 	#EXTWidth

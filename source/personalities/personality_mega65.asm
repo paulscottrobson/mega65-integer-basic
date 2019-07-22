@@ -33,8 +33,6 @@ EXTEndOfMemory = $4000 						; Memory ends.
 EXTScreen = $1000							; 2k screen RAM here
 EXTCharSet = $800							; 2k character set (0-7F) here
 
-EXTAltSpace = 64
-
 ; ******************************************************************************
 ;
 ;				Initialisation, Vector Tables, Character Set
@@ -175,7 +173,7 @@ EXTClearScreen:
 	sta 	EXTZPWork+1
 	ldy 	#0
 _EXTCSLoop:
-	lda 	#EXTAltSpace
+	lda 	#32
 	sta 	(EXTZPWork),y
 	iny
 	lda 	#0
@@ -222,7 +220,7 @@ _EXTNoCarry:
 	;
 	ldy 	#0									; clear bottom line.
 _EXTLastLine:
-	lda 	#EXTAltSpace
+	lda 	#32
 	sta 	(EXTZPWork),y
 	iny
 	iny
