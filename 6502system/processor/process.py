@@ -65,7 +65,6 @@ def defineOpcode(opcode,mnemonic,code,cycles):
 src = open("6502.def").readlines()
 src = [x if x.find("//") < 0 else x[:x.find("//")] for x in src]
 src = [x.strip().replace("\t"," ").replace("\n"," ") for x in src if x.strip() != ""]
-
 #
 #		Output all lines beginning with ':' to the support file.
 #
@@ -87,6 +86,7 @@ for l in src:
 	#
 	#		Decompose into Mnemonic cycles opcodes c-code
 	#
+
 	m = re.match("^\"([\w\s\#\%@]+)\"\s+(\d+)\s+([\(\)\w\:\,]+)\s+(.+)",l)
 	assert m is not None,"Line "+l
 	#

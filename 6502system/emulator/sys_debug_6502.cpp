@@ -27,13 +27,6 @@
 
 static int renderCount = 0;
 
-static int palette[][3] = {
-	{64,0,0},{255,255,255},{186,19,99},{102,173,255},
-	{0xBB,0xF3,0x8B},{0x55,0xEC,0x85},{0xD1,0xE0,0x79},{0xAE,0x5F,0xC7},
-	{0x9b,0x47,0x81},{0x87,0x37,0x00},{0xdd,0x39,0x78},{0xb5,0xb5,0xb5},
-	{0xb8,0xb8,0xb8},{0x0b,0x4f,0xca},{0xaa,0xd9,0xfe},{0x8b,0x8b,0x8b}
-};
-
 // *******************************************************************************************************************************
 //											This renders the debug screen
 // *******************************************************************************************************************************
@@ -119,12 +112,7 @@ void DBGXRender(int *address,int showDisplay) {
 			for (int y = 0;y < ys;y++)
 		 	{
 		 		#define CP(c) ((c) >> 4)
-		 		int col = CPUReadMemory(+y*40+0xF400) & 15;
-		 		int colour;
-		 		colour = CP(palette[col][0]) << 8;
-		 		colour |= (CP(palette[col][1]) << 4);
-		 		colour |= CP(palette[col][2]);
-
+		 		int colour = 0xF80;
 		 		int ch = CPUReadMemory(x+y*40+0xF000) ;
 		 		ch = ch & 0x7F;
 		 		int xc = x1 + x * 8 * size;
