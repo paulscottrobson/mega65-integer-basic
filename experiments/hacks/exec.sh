@@ -1,1 +1,1 @@
-../../xemu/build/bin/xmega65.native &
+../../xmega65.native &
