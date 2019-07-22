@@ -16,7 +16,7 @@
 ; ******************************************************************************
 
 EXTWidth = 40 								; screen width
-EXTHeight = 24 								; screen height
+EXTHeight = 25 								; screen height
 
 ; ******************************************************************************
 ;
@@ -112,6 +112,17 @@ EXTReadKey:
 ; ******************************************************************************
 
 EXTReadScreen:
+	phy 										; save Y
+	txa 										; multiply XY by 2
+	asl 	a
+	sta 	EXTZPWork							; into EXTZPWork
+	tya
+	rol 	a
+	ora 	#EXTScreen>>8 						; move into screen area
+	sta 	EXTZPWork+1 						; read character there
+	ldy 	#0
+	lda 	(EXTZPWork),y
+	ply 										; restore Y and exit.
 	rts
 
 ; ******************************************************************************
@@ -121,6 +132,13 @@ EXTReadScreen:
 ; ******************************************************************************
 
 EXTWriteScreen:
+	phy
+	pha
+	jsr		EXTReadScreen 						; set up the address into EXTZPWork
+	ldy 	#0
+	pla 										; restore and write.
+	sta 	(EXTZPWork),y
+	ply
 	rts
 
 ; ******************************************************************************
@@ -159,7 +177,41 @@ _EXTCSLoop:
 ;
 ; ******************************************************************************
 
+
 EXTScrollDisplay:
+	pha 										; save registers
+	phy
+	lda 	#EXTScreen & $FF 					; set pointer to screen
+	sta 	EXTZPWork+0
+	lda 	#EXTScreen >> 8
+	sta 	EXTZPWork+1
+_EXTScroll:	
+	ldy 	#EXTWidth*2 						; x 2 because of two byte format.
+	lda 	(EXTZPWork),y
+	ldy 	#0
+	sta 	(EXTZPWork),y
+	inc 	EXTZPWork 							; bump address
+	inc 	EXTZPWork
+	bne 	_EXTNoCarry
+	inc 	EXTZPWork+1
+_EXTNoCarry:
+	lda 	EXTZPWork 							; done ?
+	cmp	 	#(EXTScreen+2*EXTWidth*(EXTHeight-1)) & $FF
+	bne 	_EXTScroll
+	lda 	EXTZPWork+1
+	cmp	 	#(EXTScreen+2*EXTWidth*(EXTHeight-1)) >> 8
+	bne 	_EXTScroll
+	;
+	ldy 	#0									; clear bottom line.
+_EXTLastLine:
+	lda 	#EXTAltSpace
+	sta 	(EXTZPWork),y
+	iny
+	iny
+	cpy 	#EXTWidth*2
+	bne 	_EXTLastLine	
+	ply 										; restore and exit.
+	pla
 	rts	
 
 ; ******************************************************************************
